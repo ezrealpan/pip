@@ -5,10 +5,6 @@ import "ezreal.com.cn/pip/pip"
 // RunningInput ...
 type RunningInput struct {
 	Input pip.Input
-
-	Config *InputConfig
-
-	defaultTags map[string]string
 }
 
 // LogName ...
@@ -35,20 +31,8 @@ func (r *RunningInput) Init() error {
 }
 
 // NewRunningInput ...
-func NewRunningInput(input pip.Input, config *InputConfig) *RunningInput {
+func NewRunningInput(input pip.Input) *RunningInput {
 	return &RunningInput{
-		Input:  input,
-		Config: config,
+		Input: input,
 	}
-}
-
-// InputConfig is the common config for all inputs.
-type InputConfig struct {
-	Name string
-	Tags map[string]string
-}
-
-// SetDefaultTags ...
-func (r *RunningInput) SetDefaultTags(tags map[string]string) {
-	r.defaultTags = tags
 }
