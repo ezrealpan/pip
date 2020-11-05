@@ -1,0 +1,6 @@
+[inputs.simple]
+  # a name for the service being polled
+  ok = true
+  tip="-----tip-----"
+
+
