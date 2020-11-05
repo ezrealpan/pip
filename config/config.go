@@ -120,53 +120,28 @@ func (c *Config) LoadConfigData(data []byte) error {
 		return fmt.Errorf("Error parsing data: %s", err)
 	}
 
-	// Parse tags tables first:
-	for _, tableName := range []string{"tags", "global_tags"} {
-		if val, ok := tbl.Fields[tableName]; ok {
-			fmt.Println("val", val)
-			subTable, ok := val.(*ast.Table)
-			if !ok {
-				return fmt.Errorf("invalid configuration, bad table name %q", tableName)
-			}
-			if err = toml.UnmarshalTable(subTable, c.Tags); err != nil {
-				return fmt.Errorf("error parsing table name %q: %w", tableName, err)
-			}
-		}
-	}
-
 	// Parse all the rest of the plugins:
 	for name, val := range tbl.Fields {
 		subTable, ok := val.(*ast.Table)
 		if !ok {
 			return fmt.Errorf("invalid configuration, error parsing field %q as table", name)
 		}
-		fmt.Println("name", name)
-		fmt.Printf("subTable%+v", subTable)
 		switch name {
 		case "inputs", "plugins":
 			for pluginName, pluginVal := range subTable.Fields {
 				switch pluginSubTable := pluginVal.(type) {
 				// legacy [inputs.cpu] support
 				case *ast.Table:
-					fmt.Println("pluginName1", pluginName)
-					fmt.Printf("pluginVal1%+v", pluginVal)
 					if err = c.addInput(pluginName, pluginSubTable); err != nil {
 						return fmt.Errorf("Error parsing %s, %s", pluginName, err)
 					}
 				case []*ast.Table:
-					fmt.Println("pluginName2", pluginName)
-					fmt.Printf("pluginVal2%+v", pluginVal)
-					fmt.Println("----------------------")
 					for _, t := range pluginSubTable {
-						fmt.Printf("pluginVal2-t%+v", t)
-						fmt.Println("----------------------")
 						if err = c.addInput(pluginName, t); err != nil {
 							return fmt.Errorf("Error parsing %s, %s", pluginName, err)
 						}
 					}
 				default:
-					fmt.Println("pluginName3", pluginName)
-					fmt.Printf("pluginVal3%+v", pluginVal)
 					return fmt.Errorf("Unsupported config format: %s",
 						pluginName)
 				}
@@ -191,60 +166,13 @@ func (c *Config) addInput(name string, table *ast.Table) error {
 	}
 	input := creator()
 
-	// If the input has a SetParser function, then this means it can accept
-	// arbitrary types of input, so build the parser and set it.
-	switch t := input.(type) {
-	case parsers.ParserInput:
-		parser, err := buildParser(name, table)
-		if err != nil {
-			return err
-		}
-		t.SetParser(parser)
-	}
-
-	switch t := input.(type) {
-	case parsers.ParserFuncInput:
-		config, err := getParserConfig(name, table)
-		if err != nil {
-			return err
-		}
-		t.SetParserFunc(func() (parsers.Parser, error) {
-			return parsers.NewParser(config)
-		})
-	}
-
-	pluginConfig, err := buildInput(name, table)
-	if err != nil {
-		return err
-	}
-
 	if err := toml.UnmarshalTable(table, input); err != nil {
 		return err
 	}
 
-	rp := models.NewRunningInput(input, pluginConfig)
-	rp.SetDefaultTags(c.Tags)
+	rp := models.NewRunningInput(input)
 	c.Inputs = append(c.Inputs, rp)
 	return nil
-}
-
-// buildInput parses input specific items from the ast.Table,
-// builds the filter and returns a
-// models.InputConfig to be inserted into models.RunningInput
-func buildInput(name string, tbl *ast.Table) (*models.InputConfig, error) {
-	cp := &models.InputConfig{Name: name}
-
-	cp.Tags = make(map[string]string)
-	if node, ok := tbl.Fields["tags"]; ok {
-		if subtbl, ok := node.(*ast.Table); ok {
-			if err := toml.UnmarshalTable(subtbl, cp.Tags); err != nil {
-				return nil, fmt.Errorf("could not parse tags for input %s\n", name)
-			}
-		}
-	}
-
-	delete(tbl.Fields, "tags")
-	return cp, nil
 }
 
 // parseConfig loads a TOML configuration from a provided path and
